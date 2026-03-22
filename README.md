@@ -4,15 +4,14 @@ Use [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI as the LLM
 
 Replaces Ollama/OpenAI with Claude Code for digest summaries and quick actions. All TUI features work out of the box.
 
-## Usage
+## Prerequisites
 
-```bash
-uvx --from "lazy-take-notes @ git+https://github.com/CJHwong/lazy-take-notes.git" \
-    --with "ltn-claude-code @ git+https://github.com/CJHwong/ltn-claude-code.git" \
-    lazy-take-notes record
-```
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated (`claude` on PATH)
+- [lazy-take-notes](https://github.com/CJHwong/lazy-take-notes) v0.1.0+
 
-If you have `take-note` installed via [lazy-take-notes setup](https://github.com/CJHwong/lazy-take-notes), you can add the plugin permanently by updating the wrapper script:
+## Installation
+
+If you have `take-note` installed via [lazy-take-notes setup](https://github.com/CJHwong/lazy-take-notes), update the wrapper script to include the plugin:
 
 ```bash
 cat > "$(brew --prefix)/bin/take-note" << 'EOF'
@@ -24,9 +23,17 @@ EOF
 chmod +x "$(brew --prefix)/bin/take-note"
 ```
 
-## Configuration
+## Setup
 
-Set the provider in `config.yaml` (open with `lazy-take-notes config`):
+1. Launch the app and open **Settings** (or run `lazy-take-notes config`)
+2. In the **AI Provider** tab, select **claude-code** from the dropdown
+3. Save and start a session as usual
+
+The model fields are hidden when claude-code is selected since models are configured separately.
+
+### Plugin config
+
+Advanced settings go in `config.yaml` under the `claude_code` key:
 
 ```yaml
 llm_provider: claude-code
@@ -36,8 +43,6 @@ claude_code:
   budget: 1.0               # max USD per session (default: 1.0)
 ```
 
-Or select "claude-code" from the AI Provider dropdown in the settings TUI.
-
 ## How it works
 
 1. Shells out to `claude --print --output-format json` for each LLM call
@@ -45,11 +50,6 @@ Or select "claude-code" from the AI Provider dropdown in the settings TUI.
 3. Serializes concurrent calls with an asyncio lock to prevent session conflicts
 4. Extracts system prompts from the message list and passes them via `--append-system-prompt`
 5. Runs Claude Code from a temp directory to avoid picking up project CLAUDE.md files
-
-## Prerequisites
-
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated (`claude` on PATH)
-- [lazy-take-notes](https://github.com/CJHwong/lazy-take-notes) v0.1.0+
 
 ## Development
 

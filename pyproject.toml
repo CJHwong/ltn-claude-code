@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ltn-claude-code"
+version = "0.1.0"
+description = "Use Claude Code CLI as the LLM backend for lazy-take-notes"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "lazy-take-notes @ git+https://github.com/CJHwong/lazy-take-notes.git",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project.entry-points."lazy_take_notes.llm_providers"]
+claude-code = "ltn_claude_code:create_llm_client"
+
+[project.urls]
+Repository = "https://github.com/CJHwong/ltn-claude-code"
+Issues = "https://github.com/CJHwong/ltn-claude-code/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ltn_claude_code"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ty.environment]
+python-version = "3.11"
+python = ".venv"
+extra-paths = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "N", "UP", "S", "PLC"]
+preview = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "PLC0415"]
+
+[tool.ruff.format]
+quote-style = "single"

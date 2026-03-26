@@ -14,13 +14,13 @@ Replaces Ollama/OpenAI with Claude Code for digest summaries and quick actions. 
 If you have `take-note` installed via [lazy-take-notes setup](https://github.com/CJHwong/lazy-take-notes), update the wrapper script to include the plugin:
 
 ```bash
-cat > "$(brew --prefix)/bin/take-note" << 'EOF'
+cat > "$(which take-note)" << 'EOF'
 #!/bin/bash
 exec uvx --from "git+https://github.com/CJHwong/lazy-take-notes.git" \
     --with "ltn-claude-code @ git+https://github.com/CJHwong/ltn-claude-code.git" \
     lazy-take-notes "$@"
 EOF
-chmod +x "$(brew --prefix)/bin/take-note"
+chmod +x "$(which take-note)"
 ```
 
 ## Setup

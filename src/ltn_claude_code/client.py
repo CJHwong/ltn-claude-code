@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import shutil
+import subprocess  # noqa: S404 -- fixed argv to the claude CLI, never shell=True
 import tempfile
 import uuid
 from dataclasses import dataclass, field
@@ -91,14 +92,53 @@ class ClaudeCodeLLMClient:
         return response.content
 
     def check_connectivity(self) -> tuple[bool, str]:
-        """Check that the ``claude`` binary is on PATH."""
+        """Check that the ``claude`` binary is on PATH and logged in.
+
+        ``claude auth status --json`` is a local, non-billed check that
+        returns ``{"loggedIn": bool, ...}``. Catching a logged-out state here
+        surfaces the real problem up front instead of as a 401 mid-digest.
+        """
         if shutil.which('claude') is None:
             return False, 'claude CLI not found on PATH'
+        try:
+            proc = subprocess.run(  # noqa: S603 -- fixed arg list, not shell=True
+                ['claude', 'auth', 'status', '--json'],  # noqa: S607 -- resolved via PATH by design
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return False, f'could not check claude auth status: {exc}'
+        try:
+            status = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            return False, f'unexpected claude auth output: {proc.stdout[:200]}'
+        if not status.get('loggedIn'):
+            return False, 'claude CLI is not logged in -- run: claude auth login'
         return True, ''
 
     def check_models(self, models: list[str]) -> list[str]:
         """Always returns empty -- Claude Code handles model selection."""
         return []
+
+    def _build_cmd(self, model: str, system_prompt: str | None, *, resume: bool) -> list[str]:
+        """Assemble the ``claude`` argv. ``resume`` picks --resume over --session-id."""
+        cmd = [
+            'claude',
+            '--print',
+            '--output-format', 'json',
+            '--model', model,
+            '--max-budget-usd', str(self._config.max_budget_usd),
+            '--tools', '',
+        ]
+        # First call: --session-id to create. Subsequent: --resume to continue.
+        if resume:
+            cmd.extend(['--resume', self._config.session_id])
+        else:
+            cmd.extend(['--session-id', self._config.session_id])
+        if system_prompt:
+            cmd.extend(['--append-system-prompt', system_prompt])
+        return cmd
 
     async def _run(
         self,
@@ -109,27 +149,14 @@ class ClaudeCodeLLMClient:
     ) -> ChatResponse:
         """Execute ``claude --print`` with session persistence.
 
-        Serialized via asyncio lock to avoid session-in-use conflicts.
+        Serialized via asyncio lock so the read-then-set of the session flag is
+        atomic and concurrent calls don't both try to create the same session.
         """
-        cmd = [
-            'claude',
-            '--print',
-            '--output-format', 'json',
-            '--model', model,
-            '--max-budget-usd', str(self._config.max_budget_usd),
-            '--tools', '',
-        ]
-        # First call: --session-id to create. Subsequent: --resume to continue.
-        if self._session_created:
-            cmd.extend(['--resume', self._config.session_id])
-        else:
-            cmd.extend(['--session-id', self._config.session_id])
-        if system_prompt:
-            cmd.extend(['--append-system-prompt', system_prompt])
-
-        logger.debug('claude cmd: %s (cwd=%s)', ' '.join(cmd), self._config.cwd)
-
         async with self._lock:
+            creating = not self._session_created
+            cmd = self._build_cmd(model, system_prompt, resume=self._session_created)
+            logger.debug('claude cmd: %s (cwd=%s)', ' '.join(cmd), self._config.cwd)
+
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdin=asyncio.subprocess.PIPE,
@@ -138,6 +165,13 @@ class ClaudeCodeLLMClient:
                 cwd=self._config.cwd,
             )
             stdout, stderr = await proc.communicate(input=prompt.encode())
+
+            # claude registers the session id the moment it runs with
+            # --session-id, even if the call then fails (e.g. a 401). Mark it
+            # created here so the next call resumes instead of colliding with
+            # "Session ID is already in use".
+            if creating:
+                self._session_created = True
 
         raw_out = stdout.decode()
 
@@ -156,7 +190,6 @@ class ClaudeCodeLLMClient:
         if data.get('is_error'):
             raise RuntimeError(f'claude CLI error: {data.get("result", "unknown")}')
 
-        self._session_created = True
         usage = data.get('usage', {})
         cost = data.get('total_cost_usd', 0)
         logger.debug(

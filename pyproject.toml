@@ -9,6 +9,7 @@ description = "Use Claude Code CLI as the LLM backend for lazy-take-notes"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
+    "certifi>=2026.10.23",
     "lazy-take-notes @ git+https://github.com/CJHwong/lazy-take-notes.git",
 ]
 

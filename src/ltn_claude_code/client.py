@@ -126,10 +126,14 @@ class ClaudeCodeLLMClient:
         cmd = [
             'claude',
             '--print',
-            '--output-format', 'json',
-            '--model', model,
-            '--max-budget-usd', str(self._config.max_budget_usd),
-            '--tools', '',
+            '--output-format',
+            'json',
+            '--model',
+            model,
+            '--max-budget-usd',
+            str(self._config.max_budget_usd),
+            '--tools',
+            '',
         ]
         # First call: --session-id to create. Subsequent: --resume to continue.
         if resume:
@@ -227,4 +231,4 @@ def create_llm_client(infra: InfraConfig) -> ClaudeCodeLLMClient:
     return ClaudeCodeLLMClient(config)
 
 
-create_llm_client.manages_models = True  # type: ignore[attr-defined]
+create_llm_client.manages_models = True  # ty: ignore[unresolved-attribute] -- The plugin loader reads this flag.

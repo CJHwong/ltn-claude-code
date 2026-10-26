@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from importlib.metadata import entry_points
 from unittest.mock import patch
 
 import pytest
@@ -96,3 +97,11 @@ def test_check_connectivity_passes_when_logged_in():
     with patch('shutil.which', return_value='/usr/bin/claude'), patch('subprocess.run', return_value=completed):
         ok, msg = client.check_connectivity()
     assert ok and not msg
+
+
+def test_registered_provider_keeps_its_model_selection():
+    providers = entry_points(group='lazy_take_notes.llm_providers', name='claude-code')
+
+    assert len(providers) == 1
+    provider = next(iter(providers))
+    assert provider.load().__dict__['manages_models'] is True
